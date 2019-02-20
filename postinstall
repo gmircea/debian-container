@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+#
+# NOTE: This script is run within the chroot after second stage debootstrap!
+#
+
+set -e
+
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 DIST DIST_URL"
+  exit 1
+fi
+
+DIST=$1
+DIST_URL=$2
+HOST_NAME=mini
+
+echo "Running postinstall script..."
+
+# Set hostname
+echo "$HOST_NAME" > /etc/hostname
+sed -i "/127.0.0.1/a 127.0.1.1\t$HOST_NAME" /etc/hosts
+
+# Set root password
+echo "root:mini" | chpasswd
+
+# Make dpkg/apt-get noninteractive
+export DEBIAN_FRONTEND=noninteractive
+
+# Set the locale
+sed -i 's/^# *\(en_US.UTF-8\)/\1/' /etc/locale.gen
+dpkg-reconfigure locales
+update-locale LANG=en_US.UTF-8
+
+# Set timezone
+ln -fs /usr/share/zoneinfo/$(cat /etc/timezone) /etc/localtime
+dpkg-reconfigure tzdata
+
+# Add regular user
+adduser --disabled-password --gecos "mini" mini
+echo "mini:mini" | chpasswd
+
+# Initialize /etc/apt/sources.list
+echo "deb $DIST_URL $DIST main contrib non-free
+deb-src $DIST_URL $DIST main contrib non-free
+
+deb http://security.debian.org/ $DIST/updates main contrib non-free
+deb-src http://security.debian.org/ $DIST/updates main contrib non-free
+
+deb $DIST_URL $DIST-updates main contrib non-free
+deb-src $DIST_URL $DIST-updates main contrib non-free" > /etc/apt/sources.list
+
+# Update apt
+apt-get -y update
+apt-get -y dist-upgrade
+
+#~ # Generate the initial ramfs
+#~ update-initramfs -c -t -k $KERNEL_VERSION
+
+# Enable custom services
+systemctl enable ssh-keygen
+
+# Use the RAM for /tmp
+cp /usr/share/systemd/tmp.mount /etc/systemd/system/
+systemctl enable tmp.mount
+
+# Prevent apt-get from starting services
+echo "exit 101" > /usr/sbin/policy-rc.d
+chmod +x /usr/sbin/policy-rc.d
+
+# Re-enable services to start
+rm -f /usr/sbin/policy-rc.d
+
+# Cleanup
+apt-get clean
+find /var/log -type f -exec rm -f {} \;

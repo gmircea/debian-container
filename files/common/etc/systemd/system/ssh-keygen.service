@@ -1,0 +1,19 @@
+[Unit]
+Description=SSH server key generation
+Before=ssh.service
+ConditionPathExists=|!/etc/ssh/ssh_host_dsa_key
+ConditionPathExists=|!/etc/ssh/ssh_host_dsa_key.pub
+ConditionPathExists=|!/etc/ssh/ssh_host_ecdsa_key
+ConditionPathExists=|!/etc/ssh/ssh_host_ecdsa_key.pub
+ConditionPathExists=|!/etc/ssh/ssh_host_ed25519_key
+ConditionPathExists=|!/etc/ssh/ssh_host_ed25519_key.pub
+ConditionPathExists=|!/etc/ssh/ssh_host_rsa_key
+ConditionPathExists=|!/etc/ssh/ssh_host_rsa_key.pub
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ssh-keygen -A
+
+[Install]
+WantedBy=ssh.service
